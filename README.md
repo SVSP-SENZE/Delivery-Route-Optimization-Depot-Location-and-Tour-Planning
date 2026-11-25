@@ -2,4 +2,4 @@
 
 Team: Bharatiya Optimization Party
 
-Members: Shubhan Pokuri, Jiya Merja, Prerna Kurra
+Members: Shubhan Pokuri, Jiya Merja, Prerana Kurra
