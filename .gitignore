@@ -1,5 +1,7 @@
 .venv/
 venv/
+.pytest_cache/
+results/.matplotlib/
 __pycache__/
 *.pyc
 .ipynb_checkpoints/

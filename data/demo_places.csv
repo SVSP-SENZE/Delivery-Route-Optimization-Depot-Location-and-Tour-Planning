@@ -1,0 +1,14 @@
+name,latitude,longitude,is_baseline_depot
+Demo baseline depot,12.9716,77.5946,true
+Demo delivery 01,12.9350,77.6100,false
+Demo delivery 02,12.9440,77.5700,false
+Demo delivery 03,12.9550,77.6300,false
+Demo delivery 04,12.9650,77.5500,false
+Demo delivery 05,12.9760,77.6150,false
+Demo delivery 06,12.9850,77.5750,false
+Demo delivery 07,12.9970,77.6350,false
+Demo delivery 08,12.9480,77.6450,false
+Demo delivery 09,12.9320,77.5850,false
+Demo delivery 10,12.9900,77.5550,false
+Demo delivery 11,13.0040,77.6050,false
+Demo delivery 12,12.9580,77.5900,false

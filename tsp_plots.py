@@ -62,7 +62,7 @@ def plot_locations(all_xy, names, baseline_depot_xy, output_path="results/figure
 
     ax.set_xlabel("x (km, east of reference)")
     ax.set_ylabel("y (km, north of reference)")
-    ax.set_title("Figure 1: Bengaluru delivery locations (projected, km)")
+    ax.set_title("Figure 1: Projected delivery locations (local km)")
     ax.set_aspect("equal", adjustable="datalim")
     ax.grid(alpha=0.3)
     ax.legend(loc="best")

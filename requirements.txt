@@ -1,0 +1,6 @@
+numpy
+scipy
+pulp[cbc]>=3,<4
+pandas
+matplotlib
+pytest
