@@ -55,6 +55,11 @@ def run_optimizer_experiments(
                 objective, start, args=(points, eps), jac=gradient, method="BFGS",
                 options={"gtol": GRAD_TOL, "maxiter": MAX_OPT_ITER},
             )
+            if not reference.success:
+                raise RuntimeError(
+                    f"SciPy BFGS reference failed for dataset={dataset!r}, "
+                    f"seed={seed!r}, epsilon={eps}: {reference.message}"
+                )
             for method_name, method in METHODS.items():
                 result = method(points, start=start, eps=eps, tol=GRAD_TOL, max_iter=MAX_OPT_ITER)
                 summary_rows.append({

@@ -188,15 +188,46 @@ def plot_depot_heatmap(grid_csv="results/depot_grid.csv",
                        delivery_points=None,
                        output_path="results/figure6_heatmap.png"):
     """Plot grid tour lengths and mark deliveries, Stage 1 and grid-best depots."""
-    grid = pd.read_csv(grid_csv)
-    effects = pd.read_csv(effect_csv).set_index("depot_type")
-    if not {"grid_x", "grid_y", "tour_length_km"}.issubset(grid.columns):
-        raise ValueError("Depot grid CSV is missing the required coordinate/length columns.")
+    required_grid = {"grid_x", "grid_y", "tour_length_km"}
+    required_effects = {"depot_type", "depot_x", "depot_y", "tour_length_km"}
+    try:
+        grid = pd.read_csv(grid_csv)
+    except (OSError, ValueError, pd.errors.ParserError) as exc:
+        raise ValueError(f"Could not read depot-grid CSV: {grid_csv!s}") from exc
+    try:
+        effects = pd.read_csv(effect_csv)
+    except (OSError, ValueError, pd.errors.ParserError) as exc:
+        raise ValueError(f"Could not read depot-effect CSV: {effect_csv!s}") from exc
+    missing_grid = sorted(required_grid.difference(grid.columns))
+    if missing_grid:
+        raise ValueError("Depot grid CSV is missing required columns: " + ", ".join(missing_grid))
+    missing_effects = sorted(required_effects.difference(effects.columns))
+    if missing_effects:
+        raise ValueError("Depot effect CSV is missing required columns: " + ", ".join(missing_effects))
+    if grid.empty:
+        raise ValueError("Depot grid CSV contains no rows.")
+    if effects.empty:
+        raise ValueError("Depot effect CSV contains no rows.")
+    for column in required_grid:
+        grid[column] = pd.to_numeric(grid[column], errors="coerce")
+    for column in {"depot_x", "depot_y", "tour_length_km"}:
+        effects[column] = pd.to_numeric(effects[column], errors="coerce")
+    if grid[list(required_grid)].isna().any().any() or not np.isfinite(grid[list(required_grid)]).all().all():
+        raise ValueError("Depot grid CSV has missing, non-numeric, or non-finite values.")
+    if effects[["depot_x", "depot_y", "tour_length_km"]].isna().any().any() or not np.isfinite(effects[["depot_x", "depot_y", "tour_length_km"]]).all().all():
+        raise ValueError("Depot effect CSV has missing, non-numeric, or non-finite values.")
+    if effects["depot_type"].isna().any():
+        raise ValueError("Depot effect CSV contains missing depot_type values.")
+    if grid[["grid_x", "grid_y"]].duplicated().any():
+        raise ValueError("Depot grid CSV contains duplicate grid coordinates.")
+    effects = effects.set_index("depot_type")
     x_values = np.sort(grid["grid_x"].unique())
     y_values = np.sort(grid["grid_y"].unique())
     pivot = grid.pivot(index="grid_y", columns="grid_x", values="tour_length_km").reindex(
         index=y_values, columns=x_values
     )
+    if pivot.isna().any().any():
+        raise ValueError("Depot grid CSV does not contain a complete rectangular grid.")
     fig, ax = plt.subplots(figsize=(8, 7))
     mesh = ax.pcolormesh(x_values, y_values, pivot.to_numpy(), shading="auto", cmap="viridis_r")
     fig.colorbar(mesh, ax=ax, label="NN + 2-opt tour length (km)")

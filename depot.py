@@ -479,10 +479,14 @@ def bfgs_method(points, start=None, eps=1e-6, tol=1e-8, max_iter=1000):
             s = center - previous_center
             y = current_gradient - previous_gradient
             y_dot_s = float(np.dot(y, s))
-            if y_dot_s > 1e-10:
+            if (np.isfinite(s).all() and np.isfinite(y).all()
+                    and np.isfinite(y_dot_s) and y_dot_s > 1e-10):
                 rho = 1.0 / y_dot_s
                 V = np.eye(2) - rho * np.outer(s, y)
-                Hinv = V @ Hinv @ V.T + rho * np.outer(s, s)
+                candidate_Hinv = V @ Hinv @ V.T + rho * np.outer(s, s)
+                if (np.isfinite(candidate_Hinv).all()
+                        and np.allclose(candidate_Hinv, candidate_Hinv.T)):
+                    Hinv = candidate_Hinv
 
             history.append(
                 {
