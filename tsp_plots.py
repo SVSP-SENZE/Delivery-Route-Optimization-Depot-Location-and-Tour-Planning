@@ -57,8 +57,13 @@ def plot_locations(all_xy, names, baseline_depot_xy, output_path="results/figure
         opt = np.asarray(optimized_depot_xy, dtype=float)
         ax.scatter(*opt, c="tab:green", marker="D", s=120, edgecolor="k",
                    label="Stage 1 optimized depot", zorder=4)
+    label_offsets = {
+        "MG Road": (8, 10),
+        "Cubbon Park": (8, -14),
+    }
     for (x, y), name in zip(all_xy, names):
-        ax.annotate(name, (x, y), textcoords="offset points", xytext=(5, 5), fontsize=8)
+        ax.annotate(name, (x, y), textcoords="offset points",
+                    xytext=label_offsets.get(name, (5, 5)), fontsize=8)
 
     ax.set_xlabel("x (km, east of reference)")
     ax.set_ylabel("y (km, north of reference)")
@@ -171,8 +176,17 @@ def plot_gap(csv_path="results/scaling.csv", output_path="results/figure4_gap.pn
     Rows without a proven optimum have a blank gap_percent and are omitted.
     """
     df = pd.read_csv(csv_path)
-    df = df[df["method"].isin(["nearest_neighbour", "two_opt"])]
-    df = df[df["gap_percent"].notna()]
+    proven = df["optimality_proven"].astype(str).str.strip().str.lower() == "true"
+    exact = df[(df["method"] == "exact") & proven]
+    exact = exact[["n", "seed", "route_length_km"]].rename(
+        columns={"route_length_km": "exact_length"}
+    )
+    heuristics = df[df["method"].isin(["nearest_neighbour", "two_opt"])]
+    df = heuristics.merge(exact, on=["n", "seed"], how="inner")
+    df["gap_percent"] = 100.0 * (df["route_length_km"] - df["exact_length"]) / df["exact_length"]
+    tolerance = 1e-10
+    df.loc[(df["gap_percent"] < 0.0) & (df["gap_percent"] >= -tolerance), "gap_percent"] = 0.0
+    df = df[df["gap_percent"] >= 0.0]
 
     fig, ax = plt.subplots(figsize=(8, 6))
     if df.empty:
