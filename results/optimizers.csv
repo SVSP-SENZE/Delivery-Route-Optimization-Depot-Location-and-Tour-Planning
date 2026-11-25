@@ -1,4 +1,4 @@
 method,dataset,seed,epsilon,iterations,runtime_sec,objective,depot_x,depot_y,grad_norm,scipy_distance,scipy_success,scipy_status,scipy_message,converged
-gradient_descent,real,,1e-06,0,0.00011480000102892518,1.0000019999979999,0.5,0.0,0.0,,False,2,forced failure,True
-newton_method,real,,1e-06,0,6.78999931551516e-05,1.0000019999979999,0.5,0.0,0.0,,False,2,forced failure,True
-bfgs_method,real,,1e-06,0,6.890000076964498e-05,1.0000019999979999,0.5,0.0,0.0,,False,2,forced failure,True
+gradient_descent,real,,1e-06,0,0.00032809999538585544,1.0000019999979999,0.5,0.0,0.0,,False,2,forced failure,True
+newton_method,real,,1e-06,0,0.0002742000069702044,1.0000019999979999,0.5,0.0,0.0,,False,2,forced failure,True
+bfgs_method,real,,1e-06,0,0.00023099999816622585,1.0000019999979999,0.5,0.0,0.0,,False,2,forced failure,True
