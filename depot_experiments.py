@@ -55,15 +55,25 @@ def run_optimizer_experiments(
                 objective, start, args=(points, eps), jac=gradient, method="BFGS",
                 options={"gtol": GRAD_TOL, "maxiter": MAX_OPT_ITER},
             )
+            scipy_success = bool(reference.success)
+            scipy_status = int(reference.status)
+            scipy_message = str(reference.message)
             for method_name, method in METHODS.items():
                 result = method(points, start=start, eps=eps, tol=GRAD_TOL, max_iter=MAX_OPT_ITER)
+                scipy_distance = (
+                    float(np.linalg.norm(result["depot_xy"] - reference.x))
+                    if scipy_success else float("nan")
+                )
                 summary_rows.append({
                     "method": method_name, "dataset": dataset, "seed": seed,
                     "epsilon": eps, "iterations": result["iterations"],
                     "runtime_sec": result["runtime_sec"], "objective": result["objective"],
                     "depot_x": result["depot_xy"][0], "depot_y": result["depot_xy"][1],
                     "grad_norm": result["grad_norm"],
-                    "scipy_distance": float(np.linalg.norm(result["depot_xy"] - reference.x)),
+                    "scipy_distance": scipy_distance,
+                    "scipy_success": scipy_success,
+                    "scipy_status": scipy_status,
+                    "scipy_message": scipy_message,
                     "converged": result["converged"],
                 })
                 for record in result["history"]:

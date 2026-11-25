@@ -23,8 +23,22 @@ CSV_COLUMNS = [
 ]
 
 
+GAP_NEGATIVE_TOL = 1e-10
+
+
 def _gap(length, exact_length):
-    return 100.0 * (length - exact_length) / exact_length
+    """Return a proven-optimum gap, rejecting non-numerical negatives.
+
+    The tolerance is in percentage points and only absorbs floating-point
+    roundoff; a materially negative gap indicates inconsistent route data.
+    """
+    gap = 100.0 * (float(length) - float(exact_length)) / float(exact_length)
+    if gap < -GAP_NEGATIVE_TOL:
+        raise ValueError(
+            "Heuristic gap is materially negative relative to the proven exact "
+            f"tour: {gap:.12g}% (heuristic={length}, exact={exact_length})."
+        )
+    return 0.0 if gap < 0.0 else gap
 
 
 def _row(n, seed, method, length, runtime, solver_status=None,

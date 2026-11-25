@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from depot_plots import plot_optimizer_convergence
+from depot_plots import plot_depot_heatmap, plot_optimizer_convergence
 
 
 class TestDepotPlots(unittest.TestCase):
@@ -53,6 +53,24 @@ class TestDepotPlots(unittest.TestCase):
             self.assertEqual(returned_path, output_path)
             self.assertTrue(os.path.isfile(output_path))
             self.assertGreater(os.path.getsize(output_path), 0)
+
+    def test_heatmap_rejects_empty_grid(self):
+        with tempfile.TemporaryDirectory() as directory:
+            grid_path = os.path.join(directory, "grid.csv")
+            effect_path = os.path.join(directory, "effect.csv")
+            pd.DataFrame(columns=["grid_x", "grid_y", "tour_length_km"]).to_csv(grid_path, index=False)
+            pd.DataFrame([{"depot_type": "stage1", "depot_x": 0, "depot_y": 0, "tour_length_km": 1}]).to_csv(effect_path, index=False)
+            with self.assertRaisesRegex(ValueError, "no rows"):
+                plot_depot_heatmap(grid_path, effect_path, output_path=os.path.join(directory, "out.png"))
+
+    def test_heatmap_rejects_nonfinite_grid_values(self):
+        with tempfile.TemporaryDirectory() as directory:
+            grid_path = os.path.join(directory, "grid.csv")
+            effect_path = os.path.join(directory, "effect.csv")
+            pd.DataFrame([{"grid_x": 0, "grid_y": 0, "tour_length_km": "bad"}]).to_csv(grid_path, index=False)
+            pd.DataFrame([{"depot_type": "stage1", "depot_x": 0, "depot_y": 0, "tour_length_km": 1}]).to_csv(effect_path, index=False)
+            with self.assertRaisesRegex(ValueError, "non-finite"):
+                plot_depot_heatmap(grid_path, effect_path, output_path=os.path.join(directory, "out.png"))
 
 
 if __name__ == "__main__":

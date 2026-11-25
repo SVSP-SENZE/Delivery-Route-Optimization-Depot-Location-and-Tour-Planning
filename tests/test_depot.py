@@ -1,9 +1,11 @@
 """Numerical derivative checks for depot objective functions."""
 
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 from scipy.optimize import minimize
+import depot_experiments
 
 from depot import (
     bfgs_method,
@@ -144,6 +146,24 @@ class DepotOptimizerTests(unittest.TestCase):
         self.assertEqual(len(result["history"]), 1)
         self.assertEqual(result["history"][0]["iteration"], 0)
         self.assertIn("maximum iterations", result["message"].lower())
+
+class DepotExperimentTests(unittest.TestCase):
+    def test_failed_scipy_reference_is_rejected(self):
+        failed = type("Result", (), {
+            "success": False, "status": 2, "message": "forced failure",
+            "x": np.array([999.0, 999.0]),
+        })()
+        points = np.array([[0.0, 0.0], [1.0, 0.0]])
+        with patch.object(depot_experiments, "minimize", return_value=failed):
+            result = depot_experiments.run_optimizer_experiments(
+                points, random_seeds=[], eps_values=(1e-6,)
+            )
+        summary = result["summary_df"]
+        self.assertFalse(summary["scipy_success"].any())
+        self.assertTrue(summary["scipy_distance"].isna().all())
+        self.assertEqual(set(summary["scipy_status"]), {2})
+        self.assertEqual(set(summary["scipy_message"]), {"forced failure"})
+        self.assertEqual(len(summary), 3)
 
 
 if __name__ == "__main__":

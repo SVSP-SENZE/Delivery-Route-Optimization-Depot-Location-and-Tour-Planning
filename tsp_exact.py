@@ -10,6 +10,17 @@ from heuristics import tour_length
 __all__ = ["solve_tsp", "brute_force_tsp"]
 
 
+def _is_proven_optimal(problem_status, solution_status, pulp):
+    """Return whether PuLP explicitly reports a proven optimal solution."""
+    optimal_solution_status = str(
+        pulp.LpSolution.get(pulp.LpSolutionOptimal, pulp.LpSolutionOptimal)
+    )
+    return (
+        problem_status == pulp.LpStatusOptimal
+        and solution_status == optimal_solution_status
+    )
+
+
 def _validate_distance_matrix(D):
     try:
         matrix = np.asarray(D, dtype=float)
@@ -118,7 +129,9 @@ def solve_tsp(D, time_limit=60):
         "solver_status": solver_status,
         "solution_status": solution_status,
         "feasible": bool(feasible),
-        "optimal": bool(feasible and problem.status == pulp.LpStatusOptimal),
+            "optimal": bool(
+                feasible and _is_proven_optimal(problem.status, solution_status, pulp)
+            ),
         "runtime_sec": float(time.perf_counter() - started),
     }
 
