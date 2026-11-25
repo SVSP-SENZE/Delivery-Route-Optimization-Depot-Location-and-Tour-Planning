@@ -26,7 +26,7 @@ def generate_all_plots(
     except ImportError as exc:
         raise RuntimeError("TSP figures need tsp_plots.py and its dependencies.") from exc
     try:
-        from depot_plots import plot_convergence, plot_depot_heatmap
+        from depot_plots import plot_optimizer_convergence, plot_depot_heatmap
     except ImportError as exc:
         raise RuntimeError("Figures 5/6 need Jiya's depot_plots.py in the project root.") from exc
 
@@ -43,11 +43,12 @@ def generate_all_plots(
         ),
         "figure3": plot_runtime(str(output / "scaling.csv"), str(output / "figure3_runtime.png")),
         "figure4": plot_gap(str(output / "scaling.csv"), str(output / "figure4_gap.png")),
-        "figure5": plot_convergence(
-            str(output / "optimizer_history.csv"), str(output / "figure5_convergence.png"),
-            delivery_points=np.asarray(all_xy, dtype=float)[
+        "figure5": plot_optimizer_convergence(
+            str(output / "optimizer_history.csv"),
+            np.asarray(all_xy, dtype=float)[
                 ~np.all(np.isclose(np.asarray(all_xy, dtype=float), baseline_depot_xy), axis=1)
             ],
+            str(output / "figure5_convergence.png"), dataset="real", epsilon=1e-6,
         ),
         "figure6": plot_depot_heatmap(
             str(output / "depot_grid.csv"),

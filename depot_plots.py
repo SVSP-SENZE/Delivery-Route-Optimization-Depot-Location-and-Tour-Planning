@@ -1,59 +1,184 @@
-"""Figures 5 and 6, rendered from the saved depot experiment outputs."""
+"""Plots for saved depot-optimizer histories.
+
+This module only reads optimizer results that have already been written to CSV;
+it never imports or invokes an optimization routine.
+"""
 
 import os
 
 import matplotlib
-matplotlib.use("Agg")
+
+matplotlib.use("Agg")  # Support rendering in headless environments.
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
 
-def _prepare(path):
-    directory = os.path.dirname(path)
-    if directory:
-        os.makedirs(directory, exist_ok=True)
+_REQUIRED_COLUMNS = {
+    "dataset",
+    "seed",
+    "epsilon",
+    "method",
+    "iteration",
+    "x",
+    "y",
+    "objective",
+    "grad_norm",
+    "step_size",
+}
+
+_METHODS = {
+    "gradient descent": {
+        "label": "Gradient Descent",
+        "color": "tab:blue",
+        "marker": "o",
+    },
+    "newton": {"label": "Newton", "color": "tab:orange", "marker": "s"},
+    "bfgs": {"label": "BFGS", "color": "tab:green", "marker": "^"},
+}
+
+_METHOD_ALIASES = {
+    "gradient descent": "gradient descent",
+    "gradient_descent": "gradient descent",
+    "gd": "gradient descent",
+    "newton": "newton",
+    "newton_method": "newton",
+    "bfgs": "bfgs",
+    "bfgs_method": "bfgs",
+}
 
 
-def plot_convergence(history_csv="results/optimizer_history.csv",
-                     output_path="results/figure5_convergence.png",
-                     delivery_points=None):
-    """Plot gradient-norm convergence and coordinate paths for real data."""
-    history = pd.read_csv(history_csv)
-    history = history[(history["dataset"] == "real") & (history["epsilon"] == history["epsilon"].min())]
-    if history.empty:
-        raise ValueError("No real-dataset optimizer history is available to plot.")
-
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-    colors = {"gradient_descent": "tab:blue", "newton_method": "tab:orange", "bfgs_method": "tab:green"}
-    labels = {"gradient_descent": "Gradient Descent", "newton_method": "Newton", "bfgs_method": "BFGS"}
-    for method, group in history.groupby("method"):
-        group = group.sort_values("iteration")
-        color = colors.get(method)
-        axes[0].semilogy(group["iteration"], np.maximum(group["grad_norm"], 1e-16),
-                         marker=".", label=labels.get(method, method), color=color)
-        axes[1].plot(group["x"], group["y"], marker=".", label=labels.get(method, method), color=color)
-        axes[1].scatter(group["x"].iloc[0], group["y"].iloc[0], marker="s", color=color, s=45)
-        axes[1].scatter(group["x"].iloc[-1], group["y"].iloc[-1], marker="*", color=color, s=110)
-    axes[0].set_xlabel("Iteration")
-    axes[0].set_ylabel("Gradient norm")
-    axes[0].set_title("Gradient convergence")
-    axes[0].grid(alpha=0.3, which="both")
-    axes[0].legend()
-    axes[1].set_xlabel("x (km)")
-    axes[1].set_ylabel("y (km)")
-    axes[1].set_title("Optimizer coordinate paths")
-    if delivery_points is not None:
+def _validated_delivery_points(delivery_points):
+    """Return delivery points as a finite two-dimensional float array."""
+    try:
         points = np.asarray(delivery_points, dtype=float)
-        axes[1].scatter(points[:, 0], points[:, 1], marker="o", facecolors="none",
-                        edgecolors="black", s=35, label="Delivery points", zorder=2)
-    axes[1].set_aspect("equal", adjustable="datalim")
-    axes[1].grid(alpha=0.3)
-    axes[1].legend()
-    fig.suptitle("Figure 5: Depot optimizer convergence")
+    except (TypeError, ValueError) as exc:
+        raise ValueError("delivery_points must be a numeric array with shape (m, 2).") from exc
+
+    if points.ndim != 2 or points.shape[1:] != (2,) or points.shape[0] == 0:
+        raise ValueError("delivery_points must be a non-empty array with shape (m, 2).")
+    if not np.isfinite(points).all():
+        raise ValueError("delivery_points must contain only finite coordinates.")
+    return points
+
+
+def _read_history(history_csv_path):
+    """Load and validate the numerical fields used by the figure."""
+    try:
+        history = pd.read_csv(history_csv_path)
+    except (OSError, ValueError, pd.errors.ParserError) as exc:
+        raise ValueError(f"Could not read optimizer-history CSV: {history_csv_path!s}") from exc
+
+    missing = sorted(_REQUIRED_COLUMNS.difference(history.columns))
+    if missing:
+        raise ValueError("Optimizer-history CSV is missing required columns: " + ", ".join(missing))
+    if history.empty:
+        raise ValueError("Optimizer-history CSV contains no rows.")
+
+    numeric_columns = ["seed", "epsilon", "iteration", "x", "y", "objective", "grad_norm", "step_size"]
+    for column in numeric_columns:
+        history[column] = pd.to_numeric(history[column], errors="coerce")
+    required_numeric = [column for column in numeric_columns if column != "seed"]
+    if history[required_numeric].isna().any().any() or not np.isfinite(
+        history[required_numeric].to_numpy(dtype=float)
+    ).all():
+        raise ValueError("Optimizer-history CSV has missing, non-numeric, or non-finite numeric values.")
+    if history[["dataset", "method"]].isna().any().any():
+        raise ValueError("Optimizer-history CSV has missing dataset or method values.")
+    # Real-data rows have no random seed; randomized rows must record one.
+    real_rows = history["dataset"].astype(str).str.strip().str.lower() == "real"
+    random_seeds = history.loc[~real_rows, "seed"]
+    if (random_seeds.isna().any()
+            or not np.isfinite(random_seeds.to_numpy(dtype=float)).all()
+            or not np.isfinite(history.loc[history["seed"].notna(), "seed"].to_numpy(dtype=float)).all()):
+        raise ValueError("Optimizer-history CSV must record a finite seed for every randomized dataset.")
+    if (history["grad_norm"] < 0).any():
+        raise ValueError("Optimizer-history CSV grad_norm values must be non-negative.")
+
+    history = history.copy()
+    history["_method_key"] = history["method"].astype(str).str.strip().str.lower().map(_METHOD_ALIASES)
+    return history
+
+
+def plot_optimizer_convergence(history_csv_path, delivery_points, output_path, dataset=None, epsilon=None):
+    """Plot saved Gradient Descent, Newton, and BFGS convergence and depot paths."""
+    points = _validated_delivery_points(delivery_points)
+    history = _read_history(history_csv_path)
+
+    if dataset is not None:
+        history = history[history["dataset"] == dataset]
+    if epsilon is not None:
+        try:
+            epsilon_value = float(epsilon)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("epsilon must be a finite numeric value when provided.") from exc
+        if not np.isfinite(epsilon_value):
+            raise ValueError("epsilon must be a finite numeric value when provided.")
+        history = history[np.isclose(history["epsilon"], epsilon_value, rtol=1e-10, atol=1e-12)]
+    if history.empty:
+        filters = []
+        if dataset is not None:
+            filters.append(f"dataset={dataset!r}")
+        if epsilon is not None:
+            filters.append(f"epsilon={epsilon!r}")
+        detail = " and ".join(filters) if filters else "the supplied history"
+        raise ValueError(f"No optimizer-history rows remain after filtering by {detail}.")
+
+    available = set(history["_method_key"].dropna())
+    missing_methods = [style["label"] for key, style in _METHODS.items() if key not in available]
+    if missing_methods:
+        raise ValueError("Optimizer-history CSV is missing required methods: " + ", ".join(missing_methods))
+
+    centroid = points.mean(axis=0)
+    fig, (convergence_ax, path_ax) = plt.subplots(1, 2, figsize=(14, 6))
+
+    convergence_ax.set_title("Optimizer convergence")
+    path_ax.set_title("Optimizer depot-coordinate paths")
+    path_ax.scatter(points[:, 0], points[:, 1], c="tab:blue", s=45, alpha=0.75,
+                    label="Delivery points", zorder=2)
+    path_ax.scatter(*centroid, c="black", marker="*", s=240, edgecolor="white",
+                    linewidth=0.8, label="Starting centroid", zorder=5)
+
+    for method_key, style in _METHODS.items():
+        method_history = history[history["_method_key"] == method_key]
+        first_series = True
+        # Separate seeds before sorting so multi-seed CSVs never draw a path between runs.
+        for _, series in method_history.groupby("seed", sort=True, dropna=False):
+            series = series.sort_values("iteration")
+            grad_norm = series["grad_norm"].to_numpy(dtype=float)
+            positive_floor = np.finfo(float).tiny
+            plotted_norm = np.maximum(grad_norm, positive_floor)
+            label = style["label"] if first_series else "_nolegend_"
+            convergence_ax.semilogy(
+                series["iteration"], plotted_norm, color=style["color"], marker=style["marker"],
+                markersize=4, linewidth=1.5, label=label,
+            )
+            path_ax.plot(
+                series["x"], series["y"], color=style["color"], marker=style["marker"],
+                markersize=4, linewidth=1.5, label=label, zorder=3,
+            )
+            final = series.iloc[-1]
+            path_ax.scatter(final["x"], final["y"], c=style["color"], marker=style["marker"],
+                            s=95, edgecolor="black", linewidth=0.6, zorder=4)
+            first_series = False
+
+    convergence_ax.set_xlabel("Iteration")
+    convergence_ax.set_ylabel("Gradient norm (log scale)")
+    convergence_ax.grid(alpha=0.3, which="both")
+    convergence_ax.legend(loc="best")
+
+    path_ax.set_xlabel("x (km)")
+    path_ax.set_ylabel("y (km)")
+    path_ax.set_aspect("equal", adjustable="datalim")
+    path_ax.grid(alpha=0.3)
+    path_ax.legend(loc="best")
+
     fig.tight_layout()
-    _prepare(output_path)
-    fig.savefig(output_path, dpi=200)
+    output_path = os.fspath(output_path)
+    output_dir = os.path.dirname(output_path)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+    fig.savefig(output_path, dpi=200, format="png")
     plt.close(fig)
     return output_path
 
@@ -76,7 +201,7 @@ def plot_depot_heatmap(grid_csv="results/depot_grid.csv",
     mesh = ax.pcolormesh(x_values, y_values, pivot.to_numpy(), shading="auto", cmap="viridis_r")
     fig.colorbar(mesh, ax=ax, label="NN + 2-opt tour length (km)")
     if delivery_points is not None:
-        points = np.asarray(delivery_points, dtype=float)
+        points = _validated_delivery_points(delivery_points)
         ax.scatter(points[:, 0], points[:, 1], c="white", edgecolor="black", s=30,
                    label="Delivery points", zorder=3)
     for depot_type, label, marker, color in [
@@ -93,8 +218,10 @@ def plot_depot_heatmap(grid_csv="results/depot_grid.csv",
     ax.set_aspect("equal", adjustable="datalim")
     ax.legend(loc="best")
     fig.tight_layout()
-    _prepare(output_path)
-    fig.savefig(output_path, dpi=200)
+    output_path = os.fspath(output_path)
+    output_dir = os.path.dirname(output_path)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+    fig.savefig(output_path, dpi=200, format="png")
     plt.close(fig)
     return output_path
-
