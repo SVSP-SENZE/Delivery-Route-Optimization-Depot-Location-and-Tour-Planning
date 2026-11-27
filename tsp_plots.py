@@ -1,7 +1,5 @@
 """Figures 1-4 (locations, route comparison, runtime, optimality gap).
 
-Owner: Prerana Kurra
-
 All plotting functions read saved data (CSV / JSON / arrays). None of them
 runs any optimization, so changing a title or axis never re-solves anything.
 """
