@@ -1,7 +1,5 @@
 """Experiment A: TSP scaling and solution quality (exact vs NN vs 2-opt).
 
-Owner: Prerana Kurra
-
 Imports: data.py, tsp_exact.py, heuristics.py, config.py (one-way dependency).
 """
 
