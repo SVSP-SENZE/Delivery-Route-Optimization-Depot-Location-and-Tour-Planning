@@ -1,7 +1,5 @@
 """TSP heuristics: tour length, Nearest Neighbour and 2-opt.
 
-Owner: Prerana Kurra
-
 Route convention (shared contract)
 ----------------------------------
 A route is a list such as [0, 2, 4, 1, 3]. The depot appears once, at the
